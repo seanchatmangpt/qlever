@@ -6,8 +6,10 @@
 
 #include "libqlever/Qlever.h"
 
+#include "engine/ExecuteUpdate.h"
 #include "engine/ExportQueryExecutionTrees.h"
 #include "engine/MaterializedViews.h"
+#include "index/DeltaTriples.h"
 #include "index/IndexImpl.h"
 #include "index/TextIndexBuilder.h"
 #include "libqlever/QleverTypes.h"
@@ -137,6 +139,65 @@ std::string Qlever::query(const QueryPlan& queryPlan,
 
 #endif
   return result;
+}
+
+// _____________________________________________________________________________
+std::string Qlever::update(std::string updateString) {
+  auto parsedUpdates = SparqlParser::parseUpdate(
+      index_.getBlankNodeManager(), &index_.getImpl().encodedIriManager(),
+      updateString, {});
+
+  nlohmann::json results = nlohmann::json::array();
+
+  for (auto& parsedUpdate : parsedUpdates) {
+    // Build a fresh QueryExecutionContext that sees the current delta-triple
+    // snapshot so that chained updates observe each other's effects.
+    auto qecPtr = std::make_shared<QueryExecutionContext>(
+        index_, &cache_, allocator_, sortPerformanceEstimator_,
+        &namedResultCache_, &materializedViewsManager_);
+    qecPtr->updateLocatedTriplesSnapshot();
+
+    auto handle = std::make_shared<ad_utility::CancellationHandle<>>();
+    QueryPlanner qp{qecPtr.get(), handle};
+    qp.setEnablePatternTrick(enablePatternTrick_);
+    auto qet = qp.createExecutionTree(parsedUpdate);
+    qet.isRoot() = true;
+    auto qetPtr = std::make_shared<QueryExecutionTree>(std::move(qet));
+
+    UpdateMetadata metadata =
+        index_.deltaTriplesManager().modify<UpdateMetadata>(
+            [this, &parsedUpdate, &qetPtr,
+             &handle](DeltaTriples& deltaTriples) -> UpdateMetadata {
+              DeltaTriplesCount countBefore = deltaTriples.getCounts();
+              UpdateMetadata meta = ExecuteUpdate::executeUpdate(
+                  index_, parsedUpdate, *qetPtr, deltaTriples, handle);
+              meta.countBefore_ = countBefore;
+              meta.countAfter_ = deltaTriples.getCounts();
+              return meta;
+            });
+
+    // All cached results reference an old located-triples snapshot index, so
+    // they must be invalidated after every update.
+    cache_.clearAll();
+    namedResultCache_.clear();
+
+    nlohmann::json entry;
+    if (metadata.countBefore_.has_value()) {
+      entry["inserted-before"] = metadata.countBefore_->inserted_;
+      entry["deleted-before"] = metadata.countBefore_->deleted_;
+    }
+    if (metadata.inUpdate_.has_value()) {
+      entry["inserted-in-update"] = metadata.inUpdate_->inserted_;
+      entry["deleted-in-update"] = metadata.inUpdate_->deleted_;
+    }
+    if (metadata.countAfter_.has_value()) {
+      entry["inserted-after"] = metadata.countAfter_->inserted_;
+      entry["deleted-after"] = metadata.countAfter_->deleted_;
+    }
+    results.push_back(std::move(entry));
+  }
+
+  return results.dump();
 }
 
 // _____________________________________________________________________________

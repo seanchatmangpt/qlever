@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "qlever-sys",
+    "qlever",
+]
+resolver = "2"
