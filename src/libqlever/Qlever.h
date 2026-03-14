@@ -220,6 +220,17 @@ class Qlever {
                     ad_utility::MediaType mediaType =
                         ad_utility::MediaType::sparqlJson) const;
 
+  // Execute a SPARQL 1.1 Update (INSERT DATA, DELETE DATA, INSERT/DELETE WHERE,
+  // etc.) against the loaded index.  Updates are persisted to a
+  // `basename.update-triples` delta file when `EngineConfig::persistUpdates_`
+  // is true.  Returns a JSON string with metadata about the number of triples
+  // inserted/deleted, analogous to the QLever HTTP server response.
+  //
+  // NOTE: Accumulated delta triples slow query performance.  For large
+  // workloads, periodically rebuild the index to compact the deltas back into
+  // the main permutations.
+  std::string update(std::string updateString);
+
   // Plan, parse, and execute the given `query` and pin the result to the cache
   // with the given options (name and possibly request for building a geometry
   // index). This result can then be reused in a query as follows: `SERVICE

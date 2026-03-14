@@ -1,0 +1,17 @@
+[package]
+name = "qlever-sys"
+version = "0.1.0"
+edition = "2021"
+description = "Raw FFI bindings for the QLever embedded SPARQL engine (C shim layer)"
+license = "Apache-2.0"
+repository = "https://github.com/ad-freiburg/qlever"
+links = "qlever_c"          # tells Cargo this crate links to libqlever_c
+build = "build.rs"
+
+[dependencies]
+
+[build-dependencies]
+# `cc` compiles the C shim against the installed/built qlever_c static library.
+cc = "1"
+# `bindgen` generates raw Rust declarations from qlever_c.h.
+bindgen = { version = "0.70", default-features = false, features = ["runtime"] }
