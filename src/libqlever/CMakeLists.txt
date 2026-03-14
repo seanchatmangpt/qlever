@@ -35,3 +35,10 @@ install(TARGETS qlever_c qlever_c_static
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         PUBLIC_HEADER DESTINATION include/qlever)
+
+# ---------------------------------------------------------------------------
+# qlever_c_tests  –  GTest suite for the C shim (null-arg guards, TLS errors,
+#                    thread safety, free_string, version).
+# ---------------------------------------------------------------------------
+add_executable(qlever_c_tests qlever_c_test.cpp)
+qlever_target_link_libraries(qlever_c_tests qlever_c GTest::gtest_main)

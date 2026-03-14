@@ -181,18 +181,18 @@ std::string Qlever::update(std::string updateString) {
     cache_.clearAll();
     namedResultCache_.clear();
 
+    // Serialize counts using the existing to_json overload for DeltaTriplesCount
+    // (avoids direct field-name coupling and re-uses the canonical JSON shape
+    // that the HTTP server also produces).
     nlohmann::json entry;
     if (metadata.countBefore_.has_value()) {
-      entry["inserted-before"] = metadata.countBefore_->inserted_;
-      entry["deleted-before"] = metadata.countBefore_->deleted_;
+      entry["before"] = nlohmann::json(*metadata.countBefore_);
     }
     if (metadata.inUpdate_.has_value()) {
-      entry["inserted-in-update"] = metadata.inUpdate_->inserted_;
-      entry["deleted-in-update"] = metadata.inUpdate_->deleted_;
+      entry["in-update"] = nlohmann::json(*metadata.inUpdate_);
     }
     if (metadata.countAfter_.has_value()) {
-      entry["inserted-after"] = metadata.countAfter_->inserted_;
-      entry["deleted-after"] = metadata.countAfter_->deleted_;
+      entry["after"] = nlohmann::json(*metadata.countAfter_);
     }
     results.push_back(std::move(entry));
   }

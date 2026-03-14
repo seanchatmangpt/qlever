@@ -28,6 +28,7 @@ mod error;
 pub use error::{Error, Result};
 
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 use std::ptr::NonNull;
 
 use qlever_sys as sys;
@@ -198,7 +199,8 @@ impl Qlever {
     /// Returns [`Error::Query`] if the query is malformed or execution fails.
     pub fn query(&self, sparql: impl Into<Vec<u8>>) -> Result<String> {
         let q = CString::new(sparql).map_err(|_| Error::NulByte)?;
-        let raw = unsafe { sys::qlever_query(self.ptr.as_ptr(), q.as_ptr()) };
+        // SAFETY: qlever_query takes *const QleverHandle; cast *mut → *const.
+        let raw = unsafe { sys::qlever_query(self.ptr.as_ptr() as *const _, q.as_ptr()) };
         cstring_result_to_rust(raw, Error::Query)
     }
 
@@ -216,6 +218,7 @@ impl Qlever {
     /// Returns [`Error::Update`] if the update is malformed or execution fails.
     pub fn update(&self, sparql_update: impl Into<Vec<u8>>) -> Result<String> {
         let q = CString::new(sparql_update).map_err(|_| Error::NulByte)?;
+        // qlever_update takes *mut QleverHandle (non-const: updates mutate state).
         let raw = unsafe { sys::qlever_update(self.ptr.as_ptr(), q.as_ptr()) };
         cstring_result_to_rust(raw, Error::Update)
     }
@@ -249,7 +252,7 @@ fn last_error() -> String {
 /// `NULL` to an `Err` by calling `last_error()`.
 ///
 /// The pointer is freed via `qlever_free_string` once copied.
-fn cstring_result_to_rust(raw: *mut i8, make_err: impl FnOnce(String) -> Error) -> Result<String> {
+fn cstring_result_to_rust(raw: *mut c_char, make_err: impl FnOnce(String) -> Error) -> Result<String> {
     if raw.is_null() {
         return Err(make_err(last_error()));
     }
