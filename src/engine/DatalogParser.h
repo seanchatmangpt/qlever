@@ -162,20 +162,19 @@ class DatalogParser {
 
     if (suffix.empty()) {
       // Plain literal: "content"
-      return TripleComponent(LiteralOrIri::literalWithQuotes(quotedPart));
+      return TripleComponent(Literal::fromEscapedRdfLiteral(quotedPart.data(), quotedPart.size()));
     } else if (suffix.size() >= 2 && suffix[0] == '@') {
       // Language-tagged literal: "content"@lang
-      std::string langTag(suffix.substr(1));
-      return TripleComponent(LiteralOrIri::literalWithQuotes(
-          quotedPart,
-          std::optional<std::variant<Iri, std::string>>{std::move(langTag)}));
+      // Reconstruct the full literal string with language tag for parsing
+      std::string fullLiteral(quotedPart.begin(), quotedPart.end());
+      fullLiteral.append(suffix.begin(), suffix.end());
+      return TripleComponent(Literal::fromEscapedRdfLiteral(fullLiteral));
     } else if (suffix.size() >= 3 && suffix[0] == '^' && suffix[1] == '^') {
       // Datatyped literal: "content"^^<datatype>
-      std::string_view datatypeStr = suffix.substr(2);
-      Iri datatypeIri = Iri::fromIriref(datatypeStr);
-      return TripleComponent(LiteralOrIri::literalWithQuotes(
-          quotedPart,
-          std::optional<std::variant<Iri, std::string>>{datatypeIri}));
+      // Reconstruct the full literal string with datatype for parsing
+      std::string fullLiteral(quotedPart.begin(), quotedPart.end());
+      fullLiteral.append(suffix.begin(), suffix.end());
+      return TripleComponent(Literal::fromEscapedRdfLiteral(fullLiteral));
     } else {
       throw std::runtime_error(
           "Datalog parse error: unexpected literal suffix in: " + s);
