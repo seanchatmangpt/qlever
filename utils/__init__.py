@@ -3,6 +3,7 @@ from __future__ import annotations
 
 __version__ = "0.1.0"
 
+from .async_client import AsyncQLeverClient, AsyncQLeverError
 from .client import QLeverClient, QLeverError
 from .rdf_utils import PrefixMap, escape_sparql_string, iri, literal, parse_ntriples, parse_ntriples_line
 from .sparql_builder import (
@@ -19,6 +20,8 @@ from .sparql_builder import (
 )
 
 __all__ = [
+    'AsyncQLeverClient',
+    'AsyncQLeverError',
     'QLeverClient',
     'QLeverError',
     'PrefixMap',
