@@ -2328,3 +2328,101 @@ TEST(ExportQueryExecutionTrees, SparqlJsonWithMetaField) {
     ASSERT_FALSE(result.contains("meta"));
   }
 }
+
+// Comprehensive tests for all 8 new semantic export formats (N3, Datalog,
+// SHACL, ShEx, JSON-LD, RDF/XML, N-Quads, TriG) using a simple knowledge
+// graph with a CONSTRUCT query.
+TEST(ExportQueryExecutionTrees, ExportSemanticFormats) {
+  std::string kg =
+      "<http://example.org/Alice> <http://example.org/knows> "
+      "<http://example.org/Bob> . "
+      "<http://example.org/Alice> <http://example.org/name> \"Alice\" .";
+  std::string query = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // N3: Should produce N-Triples-like output (subject predicate object .)
+  {
+    auto result = runQueryStreamableResult(kg, query, n3);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Bob>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/name>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // Datalog: Should produce predicate(subject, object). format
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>("));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr(")."));
+    EXPECT_THAT(result, HasSubstr(", "));
+  }
+
+  // SHACL: Should contain the SHACL prefix and turtle-like triples
+  {
+    auto result = runQueryStreamableResult(kg, query, shacl);
+    EXPECT_THAT(result,
+                HasSubstr("@prefix sh: <http://www.w3.org/ns/shacl#> ."));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // ShEx: Should contain shape expressions with { [ ] } syntax
+  {
+    auto result = runQueryStreamableResult(kg, query, shex);
+    EXPECT_THAT(result, HasSubstr("{"));
+    EXPECT_THAT(result, HasSubstr("["));
+    EXPECT_THAT(result, HasSubstr("]"));
+    EXPECT_THAT(result, HasSubstr("}"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+  }
+
+  // JSON-LD: Should contain @graph and @id keys
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    EXPECT_THAT(result, HasSubstr("@id"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Alice"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/knows"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Bob"));
+    // Should be valid JSON
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+    ASSERT_FALSE(parsed["@graph"].empty());
+  }
+
+  // RDF/XML: Should contain rdf:Description and rdf:about
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("<?xml version=\"1.0\""));
+    EXPECT_THAT(result, HasSubstr("rdf:RDF"));
+    EXPECT_THAT(result, HasSubstr("rdf:Description"));
+    EXPECT_THAT(result, HasSubstr("rdf:about"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Alice"));
+    EXPECT_THAT(result, HasSubstr("</rdf:RDF>"));
+  }
+
+  // N-Quads: Should contain triple-like output with . terminators
+  {
+    auto result = runQueryStreamableResult(kg, query, nquads);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Bob>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // TriG: Should contain graph block delimiters { }
+  {
+    auto result = runQueryStreamableResult(kg, query, trig);
+    EXPECT_THAT(result, HasSubstr("{"));
+    EXPECT_THAT(result, HasSubstr("}"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+}

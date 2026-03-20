@@ -5,6 +5,10 @@
 #ifndef QLEVER_REDUCED_FEATURE_SET_FOR_CPP17
 #include "engine/GraphStoreProtocol.h"
 
+#include "engine/DatalogParser.h"
+#include "engine/JsonLdParser.h"
+#include "engine/RdfXmlParser.h"
+#include "engine/ShExParser.h"
 #include "parser/Tokenizer.h"
 #include "util/http/beast.h"
 
@@ -59,13 +63,17 @@ std::vector<TurtleTriple> GraphStoreProtocol::parseTriples(
       parser.setInputStream(body);
       return parser.parseAndReturnAllTriples();
     }
-    case ad_utility::MediaType::jsonLd:
-    case ad_utility::MediaType::rdfXml:
-    case ad_utility::MediaType::datalog:
+    case ad_utility::MediaType::rdfXml: {
+      return RdfXmlParser::parse(body);
+    }
+    case ad_utility::MediaType::jsonLd: {
+      return JsonLdParser::parse(body);
+    }
     case ad_utility::MediaType::shex: {
-      throw std::runtime_error(absl::StrCat(
-          "Input parsing for ", toString(contentType),
-          " is not yet supported."));
+      return ShExParser::parse(body);
+    }
+    case ad_utility::MediaType::datalog: {
+      return DatalogParser::parse(body);
     }
     default: {
       throwUnsupportedMediatype(toString(contentType));
