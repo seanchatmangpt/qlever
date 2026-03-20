@@ -5,7 +5,18 @@ __version__ = "0.1.0"
 
 from .client import QLeverClient, QLeverError
 from .rdf_utils import PrefixMap, escape_sparql_string, iri, literal, parse_ntriples, parse_ntriples_line
-from .sparql_builder import SPARQLQuery, ask, construct, select
+from .sparql_builder import (
+    SPARQLQuery,
+    ask,
+    construct,
+    delete_data,
+    GraphManager,
+    insert_data,
+    select,
+    service_clause,
+    update,
+    values_block,
+)
 
 __all__ = [
     'QLeverClient',
@@ -14,10 +25,16 @@ __all__ = [
     'SPARQLQuery',
     'ask',
     'construct',
+    'delete_data',
     'escape_sparql_string',
+    'GraphManager',
+    'insert_data',
     'iri',
     'literal',
     'parse_ntriples',
     'parse_ntriples_line',
     'select',
+    'service_clause',
+    'update',
+    'values_block',
 ]
