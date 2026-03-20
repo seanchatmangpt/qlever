@@ -34,7 +34,14 @@ class DatalogParser {
 
       // Find the opening parenthesis — everything before it is the predicate.
       auto parenOpen = findUnquoted(remaining, '(');
-      if (parenOpen == std::string_view::npos) break;
+      if (parenOpen == std::string_view::npos) {
+        // Malformed line (no '('): skip to next line rather than aborting all
+        // remaining input. These parsers only round-trip QLever's own output,
+        // so partial failures should not silently drop everything that follows.
+        auto nl = remaining.find('\n');
+        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        continue;
+      }
 
       std::string predicate(remaining.substr(0, parenOpen));
       trimInPlace(predicate);
@@ -42,7 +49,12 @@ class DatalogParser {
 
       // Find the comma separating subject and object.
       auto comma = findUnquoted(remaining, ',');
-      if (comma == std::string_view::npos) break;
+      if (comma == std::string_view::npos) {
+        // Malformed statement (no ','): skip to next line.
+        auto nl = remaining.find('\n');
+        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        continue;
+      }
 
       std::string subject(remaining.substr(0, comma));
       trimInPlace(subject);
@@ -50,7 +62,12 @@ class DatalogParser {
 
       // Find the closing ")." — the object is everything before it.
       auto parenClose = findUnquoted(remaining, ')');
-      if (parenClose == std::string_view::npos) break;
+      if (parenClose == std::string_view::npos) {
+        // Malformed statement (no ')'): skip to next line.
+        auto nl = remaining.find('\n');
+        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        continue;
+      }
 
       std::string object(remaining.substr(0, parenClose));
       trimInPlace(object);

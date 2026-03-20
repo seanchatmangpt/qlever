@@ -38,7 +38,10 @@ class ShExParser {
       // Extract the subject IRI (everything up to '{').
       auto openBrace = sv.find('{');
       if (openBrace == std::string_view::npos) {
-        break;
+        // No '{' found anywhere: no more well-formed blocks remain.
+        // Skip to end rather than silently dropping all remaining input.
+        sv = {};
+        continue;
       }
       std::string_view subjectStr = trim(sv.substr(0, openBrace));
       sv.remove_prefix(openBrace + 1);
@@ -46,7 +49,12 @@ class ShExParser {
       // Extract the predicate IRI (everything up to '[').
       auto openBracket = sv.find('[');
       if (openBracket == std::string_view::npos) {
-        break;
+        // Malformed block (no '['): skip to closing '}' of this block rather
+        // than aborting all remaining input. These parsers only round-trip
+        // QLever's own output, so partial failures should not drop everything.
+        auto closeBrace = sv.find('}');
+        sv = (closeBrace == std::string_view::npos) ? std::string_view{} : sv.substr(closeBrace + 1);
+        continue;
       }
       std::string_view predicateStr = trim(sv.substr(0, openBracket));
       sv.remove_prefix(openBracket + 1);
@@ -56,7 +64,10 @@ class ShExParser {
       // "value"^^<iri>), so we cannot simply search for ']'.
       auto closeBracket = findClosingBracket(sv);
       if (closeBracket == std::string_view::npos) {
-        break;
+        // Malformed block (no ']'): skip to closing '}' of this block.
+        auto closeBrace = sv.find('}');
+        sv = (closeBrace == std::string_view::npos) ? std::string_view{} : sv.substr(closeBrace + 1);
+        continue;
       }
       std::string_view objectStr = trim(sv.substr(0, closeBracket));
       sv.remove_prefix(closeBracket + 1);
