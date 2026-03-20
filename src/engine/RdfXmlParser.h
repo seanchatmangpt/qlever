@@ -7,6 +7,7 @@
 #include <regex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "parser/RdfParser.h"
@@ -16,10 +17,16 @@
 // general-purpose RDF/XML parser.
 //
 // The expected format is:
-//   <rdf:Description rdf:about="SUBJECT">
-//     <PREDICATE rdf:resource="OBJECT"/>      (IRI object)
-//     <PREDICATE>LITERAL</PREDICATE>          (literal object)
+//   <rdf:Description rdf:about="SUBJECT" xmlns:pred="PRED_NAMESPACE">
+//     <pred:local rdf:resource="OBJECT"/>      (IRI object, normal predicate)
+//     <pred:local>LITERAL</pred:local>         (literal object, normal predicate)
+//     <rdf:predicate rdf:resource="PRED"/>     (fallback: predicate without
+//     <rdf:object rdf:resource="OBJECT"/>       valid XML local name)
 //   </rdf:Description>
+//
+// The `xmlns:pred` attribute declares the predicate namespace inline.  When
+// the predicate IRI cannot be split into a valid XML namespace + NCName, the
+// export falls back to emitting <rdf:predicate> / <rdf:object> pairs.
 class RdfXmlParser {
  public:
   // Parse the given RDF/XML string and return a vector of `TurtleTriple`.
@@ -34,10 +41,15 @@ class RdfXmlParser {
           "RDF/XML input exceeds maximum allowed size of 100 MB");
     }
 
-    // Regex to match <rdf:Description rdf:about="..."> blocks.
-    // We capture the subject IRI and the inner content of each block.
+    // Regex to match <rdf:Description rdf:about="..." [xmlns:X="..."]* >
+    // blocks.  We capture the full opening tag (to extract xmlns: declarations)
+    // and the inner content of each block.
     static const std::regex descriptionRegex(
-        R"(<rdf:Description\s+rdf:about="([^"]*)">([\s\S]*?)</rdf:Description>)");
+        R"(<rdf:Description\s+rdf:about="([^"]*)"([^>]*)>([\s\S]*?)</rdf:Description>)");
+
+    // Regex to extract a single xmlns:PREFIX="URI" attribute.
+    static const std::regex xmlnsRegex(
+        R"(\bxmlns:([a-zA-Z_][\w.-]*)="([^"]*)")");
 
     // Regex to match predicates with IRI objects:
     //   <prefix:local rdf:resource="OBJECT"/>
@@ -56,7 +68,76 @@ class RdfXmlParser {
     for (auto it = descBegin; it != descEnd; ++it) {
       const std::smatch& descMatch = *it;
       std::string subjectIri = unescapeXml(descMatch[1].str());
-      std::string blockContent = descMatch[2].str();
+      // descMatch[2] holds extra attributes on <rdf:Description> (xmlns:...).
+      std::string extraAttrs = descMatch[2].str();
+      std::string blockContent = descMatch[3].str();
+
+      // Build a per-block prefix map from xmlns: declarations on the opening
+      // tag.  Always seed it with the built-in rdf: prefix.
+      std::unordered_map<std::string, std::string> prefixMap;
+      prefixMap["rdf"] = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+
+      auto nsBegin = std::sregex_iterator(extraAttrs.begin(), extraAttrs.end(),
+                                          xmlnsRegex);
+      auto nsEnd = std::sregex_iterator();
+      for (auto ns = nsBegin; ns != nsEnd; ++ns) {
+        prefixMap[(*ns)[1].str()] = (*ns)[2].str();
+      }
+
+      // Expand a "prefix:local" token using the per-block prefix map.
+      auto expandWithMap =
+          [&prefixMap](const std::string& prefixedName) -> std::string {
+        auto colonPos = prefixedName.find(':');
+        if (colonPos == std::string::npos) return prefixedName;
+        std::string prefix = prefixedName.substr(0, colonPos);
+        std::string local = prefixedName.substr(colonPos + 1);
+        auto mapIt = prefixMap.find(prefix);
+        if (mapIt != prefixMap.end()) {
+          return absl::StrCat(mapIt->second, local);
+        }
+        // Unknown prefix — return as-is so the caller can surface the error.
+        return prefixedName;
+      };
+
+      // Check for the fallback <rdf:predicate> / <rdf:object> encoding.
+      // This is used when the predicate IRI has no valid XML local name.
+      static const std::regex rdfPredicateRegex(
+          R"(<rdf:predicate\s+rdf:resource="([^"]*)"\s*/>)");
+      static const std::regex rdfObjectIriRegex(
+          R"(<rdf:object\s+rdf:resource="([^"]*)"\s*/>)");
+      static const std::regex rdfObjectLitRegex(
+          R"(<rdf:object\s*>([^<]*)</rdf:object\s*>)");
+
+      std::smatch predMatch;
+      if (std::regex_search(blockContent, predMatch, rdfPredicateRegex)) {
+        // Fallback encoding: rdf:predicate gives the predicate IRI.
+        std::string predIri = unescapeXml(predMatch[1].str());
+        std::smatch objMatch;
+        if (std::regex_search(blockContent, objMatch, rdfObjectIriRegex)) {
+          std::string objIri = unescapeXml(objMatch[1].str());
+          TurtleTriple triple;
+          triple.subject_ = TripleComponent::Iri::fromIriref(
+              wrapInAngleBrackets(subjectIri));
+          triple.predicate_ =
+              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
+          triple.object_ =
+              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(objIri));
+          result.push_back(std::move(triple));
+        } else if (std::regex_search(blockContent, objMatch,
+                                     rdfObjectLitRegex)) {
+          std::string literalValue = unescapeXml(objMatch[1].str());
+          TurtleTriple triple;
+          triple.subject_ = TripleComponent::Iri::fromIriref(
+              wrapInAngleBrackets(subjectIri));
+          triple.predicate_ =
+              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
+          triple.object_ =
+              TripleComponent::Literal::literalWithoutQuotes(literalValue);
+          result.push_back(std::move(triple));
+        }
+        // Fallback block handled; skip normal predicate scanning.
+        continue;
+      }
 
       // Find IRI object triples within this block.
       auto iriBegin = std::sregex_iterator(blockContent.begin(),
@@ -64,7 +145,7 @@ class RdfXmlParser {
       auto iterEnd = std::sregex_iterator();
       for (auto jt = iriBegin; jt != iterEnd; ++jt) {
         const std::smatch& tripleMatch = *jt;
-        std::string predicate = expandPrefixedName(tripleMatch[1].str());
+        std::string predicate = expandWithMap(tripleMatch[1].str());
         std::string objectIri = unescapeXml(tripleMatch[2].str());
 
         TurtleTriple triple;
@@ -83,7 +164,7 @@ class RdfXmlParser {
       auto litEnd = std::sregex_iterator();
       for (auto jt = litBegin; jt != litEnd; ++jt) {
         const std::smatch& tripleMatch = *jt;
-        std::string predicate = expandPrefixedName(tripleMatch[1].str());
+        std::string predicate = expandWithMap(tripleMatch[1].str());
         std::string literalValue = unescapeXml(tripleMatch[2].str());
 
         TurtleTriple triple;
@@ -104,28 +185,6 @@ class RdfXmlParser {
   // Wrap a raw IRI string in angle brackets: "http://..." -> "<http://...>"
   static std::string wrapInAngleBrackets(const std::string& iri) {
     return absl::StrCat("<", iri, ">");
-  }
-
-  // Expand known XML/RDF namespace prefixes to their full IRI form.
-  static std::string expandPrefixedName(const std::string& prefixedName) {
-    // The only namespace used in QLever's RDF/XML output.
-    static const std::string rdfPrefix =
-        "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-
-    auto colonPos = prefixedName.find(':');
-    if (colonPos == std::string::npos) {
-      return prefixedName;
-    }
-    std::string prefix = prefixedName.substr(0, colonPos);
-    std::string local = prefixedName.substr(colonPos + 1);
-
-    if (prefix == "rdf") {
-      return absl::StrCat(rdfPrefix, local);
-    }
-
-    // For unknown prefixes, return as-is (should not happen with QLever's
-    // output).
-    return prefixedName;
   }
 
   // Unescape XML entities in a string.
