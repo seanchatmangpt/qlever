@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "qlever-utils"
+version = "0.1.0"
+description = "Python utilities for QLever SPARQL engine — RDF handling, query building, HTTP client"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+keywords = ["sparql", "rdf", "knowledge-graph", "qlever"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+[project.scripts]
+qlever-utils = "utils.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ad-freiburg/qlever"
