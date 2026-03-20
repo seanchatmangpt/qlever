@@ -589,39 +589,129 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
   auto generator = constructQueryResultToTriples(
       qet, constructTriples, limitAndOffset, result, resultSize,
       std::move(cancellationHandle));
-  for (const auto& triple : generator) {
-    // Strip angle brackets from IRIs
-    auto stripAngles = [](const std::string& s) -> std::string {
-      if (s.size() >= 2 && s.front() == '<' && s.back() == '>') {
-        return s.substr(1, s.size() - 2);
+  // Helper: strip angle brackets from an IRI string like "<http://...>".
+  auto stripAngles = [](const std::string& s) -> std::string {
+    if (s.size() >= 2 && s.front() == '<' && s.back() == '>') {
+      return s.substr(1, s.size() - 2);
+    }
+    return s;
+  };
+
+  // Helper: escape XML special characters.
+  auto escapeXml = [](const std::string& s) -> std::string {
+    return absl::StrReplaceAll(
+        s, {{"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"},
+            {"\"", "&quot;"}, {"'", "&apos;"}});
+  };
+
+  // Helper: return true if `c` is a valid XML NCName start character.
+  auto isNcNameStart = [](char c) -> bool {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' ||
+           (static_cast<unsigned char>(c) >= 0x80);
+  };
+
+  // Helper: return true if `c` is a valid XML NCName continuation character.
+  auto isNcNameContinue = [](char c) -> bool {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+           (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' ||
+           (static_cast<unsigned char>(c) >= 0x80);
+  };
+
+  // Split a predicate IRI into (namespaceIri, localName) at the last '#' or
+  // '/' boundary, but only if the resulting local name is a valid XML NCName.
+  // Returns an empty pair if no valid split is found.
+  auto splitPredicate =
+      [&isNcNameStart, &isNcNameContinue](
+          const std::string& iri) -> std::pair<std::string, std::string> {
+    // Find split point: last '#' takes priority over last '/'.
+    size_t splitPos = std::string::npos;
+    size_t hashPos = iri.rfind('#');
+    size_t slashPos = iri.rfind('/');
+    if (hashPos != std::string::npos) {
+      splitPos = hashPos + 1;  // namespace includes the '#'
+    } else if (slashPos != std::string::npos) {
+      splitPos = slashPos + 1;  // namespace includes the '/'
+    }
+    if (splitPos == std::string::npos || splitPos >= iri.size()) {
+      return {};
+    }
+    std::string localName = iri.substr(splitPos);
+    if (localName.empty() || !isNcNameStart(localName[0])) {
+      return {};
+    }
+    for (size_t i = 1; i < localName.size(); ++i) {
+      if (!isNcNameContinue(localName[i])) {
+        return {};
       }
-      return s;
-    };
+    }
+    return {iri.substr(0, splitPos), localName};
+  };
+
+  for (const auto& triple : generator) {
     std::string subject = stripAngles(triple.subject_);
     std::string predicate = stripAngles(triple.predicate_);
 
-    // Escape XML special characters in the subject and predicate URIs
-    auto escapeXml = [](const std::string& s) -> std::string {
-      return absl::StrReplaceAll(s, {{"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"}, {"\"", "&quot;"}, {"'", "&apos;"}});
-    };
+    // Split the predicate IRI into namespace + local name so it can be used
+    // as an XML element name.  The namespace is declared inline with the
+    // fixed prefix "pred" on the <rdf:Description> element.
+    auto [predNs, predLocal] = splitPredicate(predicate);
+    const bool hasSplit = !predNs.empty();
 
-    STREAMABLE_YIELD(absl::StrCat("  <rdf:Description rdf:about=\"",
-                                  escapeXml(subject), "\">\n"));
-    // Determine the predicate local name and namespace
-    // Use the full IRI as element name with rdf:resource or literal value
-    if (ql::starts_with(triple.object_, '<')) {
-      std::string object = stripAngles(triple.object_);
-      STREAMABLE_YIELD(absl::StrCat("    <rdf:value rdf:resource=\"",
-                                    escapeXml(object), "\"/>\n"));
+    if (hasSplit) {
+      // Emit <rdf:Description rdf:about="S" xmlns:pred="NS">
+      STREAMABLE_YIELD(absl::StrCat("  <rdf:Description rdf:about=\"",
+                                    escapeXml(subject),
+                                    "\" xmlns:pred=\"", escapeXml(predNs),
+                                    "\">\n"));
     } else {
-      std::string objectStr;
-      if (ql::starts_with(triple.object_, '"')) {
-        objectStr = RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      // Predicate IRI has no valid local name; fall back to encoding it as
+      // rdf:predicate / rdf:object inside an rdf:Statement so no information
+      // is lost.  The parser handles this form via the standard RDF triple
+      // element pattern below.
+      STREAMABLE_YIELD(absl::StrCat("  <rdf:Description rdf:about=\"",
+                                    escapeXml(subject), "\">\n"));
+    }
+
+    if (hasSplit) {
+      // Use <pred:localName rdf:resource="OBJECT"/> or
+      // <pred:localName>LITERAL</pred:localName>.
+      if (ql::starts_with(triple.object_, '<')) {
+        std::string object = stripAngles(triple.object_);
+        STREAMABLE_YIELD(absl::StrCat("    <pred:", predLocal,
+                                      " rdf:resource=\"", escapeXml(object),
+                                      "\"/>\n"));
       } else {
-        objectStr = triple.object_;
+        std::string objectStr;
+        if (ql::starts_with(triple.object_, '"')) {
+          objectStr =
+              RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+        } else {
+          objectStr = triple.object_;
+        }
+        STREAMABLE_YIELD(absl::StrCat("    <pred:", predLocal, ">",
+                                      escapeXml(objectStr), "</pred:",
+                                      predLocal, ">\n"));
       }
-      STREAMABLE_YIELD(absl::StrCat("    <rdf:value>", escapeXml(objectStr),
-                                    "</rdf:value>\n"));
+    } else {
+      // Fallback: encode as <rdf:predicate> / <rdf:object> pair so the
+      // predicate IRI is not silently discarded.
+      STREAMABLE_YIELD(absl::StrCat("    <rdf:predicate rdf:resource=\"",
+                                    escapeXml(predicate), "\"/>\n"));
+      if (ql::starts_with(triple.object_, '<')) {
+        std::string object = stripAngles(triple.object_);
+        STREAMABLE_YIELD(absl::StrCat("    <rdf:object rdf:resource=\"",
+                                      escapeXml(object), "\"/>\n"));
+      } else {
+        std::string objectStr;
+        if (ql::starts_with(triple.object_, '"')) {
+          objectStr =
+              RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+        } else {
+          objectStr = triple.object_;
+        }
+        STREAMABLE_YIELD(absl::StrCat("    <rdf:object>", escapeXml(objectStr),
+                                      "</rdf:object>\n"));
+      }
     }
     STREAMABLE_YIELD("  </rdf:Description>\n");
   }
@@ -1641,7 +1731,7 @@ ExportQueryExecutionTrees::computeResult(
 
 #else
   ad_utility::ConstexprSwitch<csv, tsv, octetStream, turtle, sparqlXml,
-                              sparqlJson, qleverJson,
+                              sparqlJson, qleverJson, binaryQleverExport,
                               n3, datalog, shacl, shex,
                               jsonLd, rdfXml, nquads, trig>{}(compute, mediaType);
 #endif
