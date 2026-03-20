@@ -958,8 +958,11 @@ ad_utility::MediaType Server::chooseBestFittingMediaType(
                                        MediaType::binaryQleverExport};
         return ad_utility::contains(supportedMediaTypes, mediaType);
       }
-      std::array supportedMediaTypes{MediaType::csv, MediaType::tsv,
-                                     MediaType::qleverJson, MediaType::turtle};
+      std::array supportedMediaTypes{
+          MediaType::csv,    MediaType::tsv,    MediaType::qleverJson,
+          MediaType::turtle, MediaType::n3,     MediaType::datalog,
+          MediaType::shacl,  MediaType::shex,   MediaType::jsonLd,
+          MediaType::rdfXml, MediaType::nquads, MediaType::trig};
       return ad_utility::contains(supportedMediaTypes, mediaType);
     });
     if (it != candidates.end()) {
