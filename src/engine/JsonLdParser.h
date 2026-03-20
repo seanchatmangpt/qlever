@@ -30,6 +30,13 @@ class JsonLdParser {
   static std::vector<TurtleTriple> parse(const std::string& input) {
     std::vector<TurtleTriple> result;
 
+    // Guard against excessively large inputs to prevent unbounded memory
+    // allocation. 100 MB is generous for Graph Store Protocol payloads.
+    constexpr size_t maxInputSize = 100 * 1024 * 1024;
+    if (input.size() > maxInputSize) {
+      throw std::runtime_error(
+          "JSON-LD input exceeds maximum allowed size of 100 MB");
+    }
     nlohmann::json doc = nlohmann::json::parse(input);
 
     // Collect the node objects: either from "@graph" array or treat the

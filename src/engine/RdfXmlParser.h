@@ -26,6 +26,14 @@ class RdfXmlParser {
   static std::vector<TurtleTriple> parse(const std::string& input) {
     std::vector<TurtleTriple> result;
 
+    // Guard against excessively large inputs to prevent ReDoS with the
+    // backtracking regex engine. 100 MB is generous for Graph Store Protocol.
+    constexpr size_t maxInputSize = 100 * 1024 * 1024;
+    if (input.size() > maxInputSize) {
+      throw std::runtime_error(
+          "RDF/XML input exceeds maximum allowed size of 100 MB");
+    }
+
     // Regex to match <rdf:Description rdf:about="..."> blocks.
     // We capture the subject IRI and the inner content of each block.
     static const std::regex descriptionRegex(

@@ -244,10 +244,13 @@ void runConstructQueryTestCase(
   EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:RDF"));
   EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:Description"));
 
-  // ShEx format should not crash.
+  // ShEx format should produce valid shape expression syntax.
   auto shexResult =
       runQueryStreamableResult(testCase.kg, testCase.query, shex);
-  (void)shexResult;
+  EXPECT_THAT(shexResult, HasSubstr("{"));
+  EXPECT_THAT(shexResult, HasSubstr("}"));
+  EXPECT_THAT(shexResult, HasSubstr("["));
+  EXPECT_THAT(shexResult, HasSubstr("]"));
 
   // Test the interaction of normal limit (the LIMIT of the query) and export
   // limit (the value of the `send` parameter).
