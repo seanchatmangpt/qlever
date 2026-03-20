@@ -34,6 +34,10 @@ e2e_data/*
 *.out
 *.app
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Local aux files (IDE, etc)
 .idea
 
