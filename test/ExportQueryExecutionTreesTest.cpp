@@ -203,6 +203,52 @@ void runConstructQueryTestCase(
   EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, turtle),
             testCase.resultTurtle);
 
+  // N3 should produce the same output as Turtle (N3 is a superset).
+  EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, n3),
+            testCase.resultTurtle);
+
+  // N-Quads should produce the same output as Turtle for default graph.
+  EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, nquads),
+            testCase.resultTurtle);
+
+  // SHACL adds a prefix header, then same triples as Turtle.
+  auto shaclResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, shacl);
+  EXPECT_THAT(shaclResult, HasSubstr("@prefix sh:"));
+  if (!testCase.resultTurtle.empty()) {
+    EXPECT_THAT(shaclResult, HasSubstr(testCase.resultTurtle));
+  }
+
+  // TriG wraps output in graph block.
+  auto trigResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, trig);
+  EXPECT_THAT(trigResult, HasSubstr("{"));
+  EXPECT_THAT(trigResult, HasSubstr("}"));
+
+  // Datalog format should not crash and produces predicate(subject, object).
+  auto datalogResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, datalog);
+  if (!testCase.resultTurtle.empty()) {
+    EXPECT_THAT(datalogResult, HasSubstr("("));
+    EXPECT_THAT(datalogResult, HasSubstr(")."));
+  }
+
+  // JSON-LD format should produce valid JSON with @graph.
+  auto jsonLdResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, jsonLd);
+  EXPECT_THAT(jsonLdResult, HasSubstr("@graph"));
+
+  // RDF/XML format should produce valid XML with rdf:RDF.
+  auto rdfXmlResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, rdfXml);
+  EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:RDF"));
+  EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:Description"));
+
+  // ShEx format should not crash.
+  auto shexResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, shex);
+  (void)shexResult;
+
   // Test the interaction of normal limit (the LIMIT of the query) and export
   // limit (the value of the `send` parameter).
   for (uint64_t exportLimit = 0ul; exportLimit < 4ul; ++exportLimit) {

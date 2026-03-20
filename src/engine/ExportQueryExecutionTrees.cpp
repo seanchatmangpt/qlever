@@ -359,6 +359,309 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
 }
 
 // _____________________________________________________________________________
+// N3 export for CONSTRUCT queries (N3 is a superset of Turtle, reuse Turtle output)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::n3>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(' ');
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD(' ');
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD(" .\n");
+  }
+}
+
+// _____________________________________________________________________________
+// SHACL export for CONSTRUCT queries (SHACL uses Turtle syntax)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::shacl>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  // SHACL shapes are expressed in Turtle syntax
+  result->logResultSize();
+  STREAMABLE_YIELD("@prefix sh: <http://www.w3.org/ns/shacl#> .\n\n");
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(' ');
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD(' ');
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD(" .\n");
+  }
+}
+
+// _____________________________________________________________________________
+// TriG export for CONSTRUCT queries (Turtle with named graph wrapper)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::trig>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  STREAMABLE_YIELD("{\n");
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    STREAMABLE_YIELD("  ");
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(' ');
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD(' ');
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD(" .\n");
+  }
+  STREAMABLE_YIELD("}\n");
+}
+
+// _____________________________________________________________________________
+// N-Quads export for CONSTRUCT queries (N-Triples with optional graph component)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::nquads>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(' ');
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD(' ');
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD(" .\n");
+  }
+}
+
+// _____________________________________________________________________________
+// Datalog export for CONSTRUCT queries (predicate(subject, object). format)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::datalog>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    // Datalog format: predicate(subject, object).
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD('(');
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(", ");
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD(").\n");
+  }
+}
+
+// _____________________________________________________________________________
+// JSON-LD export for CONSTRUCT queries
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::jsonLd>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  STREAMABLE_YIELD("{\n  \"@graph\": [\n");
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  bool isFirst = true;
+  for (const auto& triple : generator) {
+    if (!isFirst) {
+      STREAMABLE_YIELD(",\n");
+    }
+    isFirst = false;
+    // Build a JSON-LD node object for each triple
+    std::string subjectStr = triple.subject_;
+    std::string predicateStr = triple.predicate_;
+    std::string objectStr;
+    if (ql::starts_with(triple.object_, '"')) {
+      objectStr = RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+    } else {
+      objectStr = triple.object_;
+    }
+    // Remove angle brackets from IRIs for JSON-LD
+    auto stripAngles = [](const std::string& s) -> std::string {
+      if (s.size() >= 2 && s.front() == '<' && s.back() == '>') {
+        return s.substr(1, s.size() - 2);
+      }
+      return s;
+    };
+    nlohmann::json node;
+    node["@id"] = stripAngles(subjectStr);
+    // Check if object is an IRI (starts with <) or a literal
+    if (ql::starts_with(triple.object_, '<')) {
+      node[stripAngles(predicateStr)] = nlohmann::json{{"@id", stripAngles(objectStr)}};
+    } else {
+      node[stripAngles(predicateStr)] = objectStr;
+    }
+    STREAMABLE_YIELD("    ");
+    STREAMABLE_YIELD(node.dump());
+  }
+  STREAMABLE_YIELD("\n  ]\n}\n");
+}
+
+// _____________________________________________________________________________
+// RDF/XML export for CONSTRUCT queries
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::rdfXml>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  STREAMABLE_YIELD(
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n");
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  for (const auto& triple : generator) {
+    // Strip angle brackets from IRIs
+    auto stripAngles = [](const std::string& s) -> std::string {
+      if (s.size() >= 2 && s.front() == '<' && s.back() == '>') {
+        return s.substr(1, s.size() - 2);
+      }
+      return s;
+    };
+    std::string subject = stripAngles(triple.subject_);
+    std::string predicate = stripAngles(triple.predicate_);
+
+    // Escape XML special characters in the subject and predicate URIs
+    auto escapeXml = [](const std::string& s) -> std::string {
+      return absl::StrReplaceAll(s, {{"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"}, {"\"", "&quot;"}, {"'", "&apos;"}});
+    };
+
+    STREAMABLE_YIELD(absl::StrCat("  <rdf:Description rdf:about=\"",
+                                  escapeXml(subject), "\">\n"));
+    // Determine the predicate local name and namespace
+    // Use the full IRI as element name with rdf:resource or literal value
+    if (ql::starts_with(triple.object_, '<')) {
+      std::string object = stripAngles(triple.object_);
+      STREAMABLE_YIELD(absl::StrCat("    <rdf:value rdf:resource=\"",
+                                    escapeXml(object), "\"/>\n"));
+    } else {
+      std::string objectStr;
+      if (ql::starts_with(triple.object_, '"')) {
+        objectStr = RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      } else {
+        objectStr = triple.object_;
+      }
+      STREAMABLE_YIELD(absl::StrCat("    <rdf:value>", escapeXml(objectStr),
+                                    "</rdf:value>\n"));
+    }
+    STREAMABLE_YIELD("  </rdf:Description>\n");
+  }
+  STREAMABLE_YIELD("</rdf:RDF>\n");
+}
+
+// _____________________________________________________________________________
+// ShEx export for CONSTRUCT queries (Shape Expressions compact syntax)
+template <>
+STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
+    constructQueryResultToStream<ad_utility::MediaType::shex>(
+        const QueryExecutionTree& qet,
+        const ad_utility::sparql_types::Triples& constructTriples,
+        LimitOffsetClause limitAndOffset, std::shared_ptr<const Result> result,
+        CancellationHandle cancellationHandle,
+        [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
+  result->logResultSize();
+  STREAMABLE_YIELD("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\n");
+  [[maybe_unused]] uint64_t resultSize = 0;
+  auto generator = constructQueryResultToTriples(
+      qet, constructTriples, limitAndOffset, result, resultSize,
+      std::move(cancellationHandle));
+  // Output each triple as a simple ShEx shape expression
+  for (const auto& triple : generator) {
+    STREAMABLE_YIELD(triple.subject_);
+    STREAMABLE_YIELD(" {\n  ");
+    STREAMABLE_YIELD(triple.predicate_);
+    STREAMABLE_YIELD(" [");
+    if (ql::starts_with(triple.object_, '"')) {
+      std::string objectAsValidRdfLiteral =
+          RdfEscaping::validRDFLiteralFromNormalized(triple.object_);
+      STREAMABLE_YIELD(objectAsValidRdfLiteral);
+    } else {
+      STREAMABLE_YIELD(triple.object_);
+    }
+    STREAMABLE_YIELD("] ;\n}\n\n");
+  }
+}
+
+// _____________________________________________________________________________
 ad_utility::InputRangeTypeErased<std::string>
 ExportQueryExecutionTrees::constructQueryResultBindingsToQLeverJSON(
     const QueryExecutionTree& qet,
@@ -875,12 +1178,24 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::selectQueryResultToStream(
     [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
   static_assert(format == MediaType::octetStream || format == MediaType::csv ||
                 format == MediaType::tsv || format == MediaType::turtle ||
-                format == MediaType::qleverJson);
+                format == MediaType::qleverJson ||
+                format == MediaType::n3 || format == MediaType::datalog ||
+                format == MediaType::shacl || format == MediaType::shex ||
+                format == MediaType::jsonLd || format == MediaType::rdfXml ||
+                format == MediaType::nquads || format == MediaType::trig);
 
   // TODO<joka921> Use a proper error message, or check that we get a more
   // reasonable error from upstream.
   AD_CONTRACT_CHECK(format != MediaType::turtle);
   AD_CONTRACT_CHECK(format != MediaType::qleverJson);
+  AD_CONTRACT_CHECK(format != MediaType::n3);
+  AD_CONTRACT_CHECK(format != MediaType::datalog);
+  AD_CONTRACT_CHECK(format != MediaType::shacl);
+  AD_CONTRACT_CHECK(format != MediaType::shex);
+  AD_CONTRACT_CHECK(format != MediaType::jsonLd);
+  AD_CONTRACT_CHECK(format != MediaType::rdfXml);
+  AD_CONTRACT_CHECK(format != MediaType::nquads);
+  AD_CONTRACT_CHECK(format != MediaType::trig);
 
   // This call triggers the possibly expensive computation of the query result
   // unless the result is already cached.
@@ -1183,7 +1498,11 @@ ExportQueryExecutionTrees::constructQueryResultToStream(
                 format == MediaType::tsv || format == MediaType::sparqlXml ||
                 format == MediaType::sparqlJson ||
                 format == MediaType::qleverJson ||
-                format == MediaType::binaryQleverExport);
+                format == MediaType::binaryQleverExport ||
+                format == MediaType::n3 || format == MediaType::datalog ||
+                format == MediaType::shacl || format == MediaType::shex ||
+                format == MediaType::jsonLd || format == MediaType::rdfXml ||
+                format == MediaType::nquads || format == MediaType::trig);
   if constexpr (format == MediaType::octetStream ||
                 format == MediaType::binaryQleverExport) {
     AD_THROW("Binary export is not supported for CONSTRUCT queries");
@@ -1301,13 +1620,17 @@ ExportQueryExecutionTrees::computeResult(
 
   static constexpr std::array supportedTypes{
       csv,       tsv,        octetStream, turtle,
-      sparqlXml, sparqlJson, qleverJson,  binaryQleverExport};
+      sparqlXml, sparqlJson, qleverJson,  binaryQleverExport,
+      n3,        datalog,    shacl,       shex,
+      jsonLd,    rdfXml,     nquads,      trig};
   AD_CORRECTNESS_CHECK(ad_utility::contains(supportedTypes, mediaType));
 
 #ifndef QLEVER_REDUCED_FEATURE_SET_FOR_CPP17
   auto inner =
       ad_utility::ConstexprSwitch<csv, tsv, octetStream, turtle, sparqlXml,
-                                  sparqlJson, qleverJson, binaryQleverExport>{}(
+                                  sparqlJson, qleverJson, binaryQleverExport,
+                                  n3, datalog, shacl, shex,
+                                  jsonLd, rdfXml, nquads, trig>{}(
           compute, mediaType);
 
   return [](auto range) -> cppcoro::generator<std::string> {
@@ -1318,7 +1641,9 @@ ExportQueryExecutionTrees::computeResult(
 
 #else
   ad_utility::ConstexprSwitch<csv, tsv, octetStream, turtle, sparqlXml,
-                              sparqlJson, qleverJson>{}(compute, mediaType);
+                              sparqlJson, qleverJson,
+                              n3, datalog, shacl, shex,
+                              jsonLd, rdfXml, nquads, trig>{}(compute, mediaType);
 #endif
 }
 

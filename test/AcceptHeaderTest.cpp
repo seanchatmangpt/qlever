@@ -153,27 +153,66 @@ TEST(AcceptHeaderParser, FindMediaTypeFromAcceptHeader) {
   result = getMediaTypesFromAcceptHeader(p);
   EXPECT_THAT(result, ElementsAre());
 
-  // The wildcard matches csv, tsv and turtle, but not the json variants
+  // The wildcard matches csv, tsv, turtle, and text-type semantic formats
   p = "text/*, text/html";
   result = getMediaTypesFromAcceptHeader(p);
   EXPECT_THAT(result,
-              ElementsAre(MediaType::tsv, MediaType::csv, MediaType::turtle));
+              ElementsAre(MediaType::tsv, MediaType::csv, MediaType::turtle,
+                          MediaType::n3, MediaType::datalog, MediaType::shacl,
+                          MediaType::shex));
 
-  // The wildcard matches csv/tsv/turtle, qlever-json has higher precedence
+  // The wildcard matches text types, qlever-json has higher precedence
   // because it is explicit.
   p = "text/*, application/qlever-results+json";
   result = getMediaTypesFromAcceptHeader(p);
   EXPECT_THAT(result, ElementsAre(MediaType::qleverJson, MediaType::tsv,
-                                  MediaType::csv, MediaType::turtle));
+                                  MediaType::csv, MediaType::turtle,
+                                  MediaType::n3, MediaType::datalog,
+                                  MediaType::shacl, MediaType::shex));
 
-  // The wildcard matches tsv/csv/turtle, since the json is not supported.
+  // The wildcard matches text types, since the json is not supported.
   p = "text/*, application/json";
   result = getMediaTypesFromAcceptHeader(p);
   EXPECT_THAT(result,
-              ElementsAre(MediaType::tsv, MediaType::csv, MediaType::turtle));
+              ElementsAre(MediaType::tsv, MediaType::csv, MediaType::turtle,
+                          MediaType::n3, MediaType::datalog, MediaType::shacl,
+                          MediaType::shex));
 
   // Expect that values are reordered due to higher quality value.
   p = "text/tab-separated-values;q=0.3, text/csv;q=0.4";
   result = getMediaTypesFromAcceptHeader(p);
   EXPECT_THAT(result, ElementsAre(MediaType::csv, MediaType::tsv));
+
+  // Test new semantic format MIME types
+  p = "text/n3";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::n3));
+
+  p = "text/x-datalog";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::datalog));
+
+  p = "text/shacl";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::shacl));
+
+  p = "text/shex";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::shex));
+
+  p = "application/ld+json";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::jsonLd));
+
+  p = "application/rdf+xml";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::rdfXml));
+
+  p = "application/n-quads";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::nquads));
+
+  p = "application/trig";
+  result = getMediaTypesFromAcceptHeader(p);
+  EXPECT_THAT(result, ElementsAre(MediaType::trig));
 }
