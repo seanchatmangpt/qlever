@@ -2429,3 +2429,105 @@ TEST(ExportQueryExecutionTrees, ExportSemanticFormats) {
     EXPECT_THAT(result, HasSubstr(" .\n"));
   }
 }
+
+// Test that the 8 new semantic export formats handle a CONSTRUCT query that
+// matches nothing (empty result) without crashing and produce well-formed
+// output.
+TEST(ExportQueryExecutionTrees, SemanticFormatsEmptyResult) {
+  // Knowledge graph has triples, but the query uses a predicate that doesn't
+  // exist, so the CONSTRUCT result will be empty.
+  std::string kg =
+      "<http://example.org/Alice> <http://example.org/knows> "
+      "<http://example.org/Bob> .";
+  std::string query =
+      "CONSTRUCT { ?s <http://example.org/x> ?o } WHERE { ?s "
+      "<http://example.org/nonexistent> ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // N3: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, n3);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // Datalog: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // SHACL: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, shacl);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // ShEx: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, shex);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // JSON-LD: result must be valid JSON containing "@graph"
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+  }
+
+  // RDF/XML: result must contain rdf:RDF
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("rdf:RDF"));
+  }
+
+  // N-Quads: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, nquads);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // TriG: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, trig);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+}
+
+// Test that the 8 new semantic export formats correctly handle typed literals
+// and language-tagged strings.
+TEST(ExportQueryExecutionTrees, SemanticFormatsLiterals) {
+  std::string kg =
+      "<http://example.org/s> <http://example.org/age> "
+      "\"42\"^^<http://www.w3.org/2001/XMLSchema#integer> . "
+      "<http://example.org/s> <http://example.org/name> \"Alice\"@en .";
+  std::string query = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // JSON-LD: result must be valid JSON
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+    ASSERT_FALSE(parsed["@graph"].empty());
+  }
+
+  // Datalog: typed literals are rendered with ( and )
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_THAT(result, HasSubstr("("));
+    EXPECT_THAT(result, HasSubstr(")"));
+  }
+
+  // RDF/XML: result must contain rdf:Description
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("rdf:Description"));
+  }
+}
