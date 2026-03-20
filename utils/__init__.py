@@ -18,8 +18,10 @@ from .sparql_builder import (
     update,
     values_block,
 )
+from . import templates
 
 __all__ = [
+    'templates',
     'AsyncQLeverClient',
     'AsyncQLeverError',
     'QLeverClient',
