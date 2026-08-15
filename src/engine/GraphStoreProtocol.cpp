@@ -5,6 +5,10 @@
 #ifndef QLEVER_REDUCED_FEATURE_SET_FOR_CPP17
 #include "engine/GraphStoreProtocol.h"
 
+#include "engine/DatalogParser.h"
+#include "engine/JsonLdParser.h"
+#include "engine/RdfXmlParser.h"
+#include "engine/ShExParser.h"
 #include "parser/Tokenizer.h"
 #include "util/http/beast.h"
 
@@ -18,7 +22,15 @@ void GraphStoreProtocol::throwUnsupportedMediatype(
           "\" is not supported for SPARQL Graph Store HTTP Protocol in QLever. "
           "Supported: ",
           toString(ad_utility::MediaType::turtle), ", ",
-          toString(ad_utility::MediaType::ntriples), "."));
+          toString(ad_utility::MediaType::ntriples), ", ",
+          toString(ad_utility::MediaType::n3), ", ",
+          toString(ad_utility::MediaType::shacl), ", ",
+          toString(ad_utility::MediaType::trig), ", ",
+          toString(ad_utility::MediaType::nquads), ", ",
+          toString(ad_utility::MediaType::jsonLd), ", ",
+          toString(ad_utility::MediaType::rdfXml), ", ",
+          toString(ad_utility::MediaType::datalog), ", ",
+          toString(ad_utility::MediaType::shex), "."));
 }
 
 // ____________________________________________________________________________
@@ -36,7 +48,11 @@ std::vector<TurtleTriple> GraphStoreProtocol::parseTriples(
   using Re2Parser = RdfStringParser<TurtleParser<Tokenizer>>;
   switch (contentType) {
     case ad_utility::MediaType::turtle:
-    case ad_utility::MediaType::ntriples: {
+    case ad_utility::MediaType::n3:
+    case ad_utility::MediaType::shacl:
+    case ad_utility::MediaType::trig:
+    case ad_utility::MediaType::ntriples:
+    case ad_utility::MediaType::nquads: {
       // TODO<joka921> We could pass in the actual manager here,
       // then the resulting triples could (possibly) be already much
       // smaller. This will be done in a future version where we pass the state
@@ -46,6 +62,18 @@ std::vector<TurtleTriple> GraphStoreProtocol::parseTriples(
       auto parser = Re2Parser(&encodedIriManager);
       parser.setInputStream(body);
       return parser.parseAndReturnAllTriples();
+    }
+    case ad_utility::MediaType::rdfXml: {
+      return RdfXmlParser::parse(body);
+    }
+    case ad_utility::MediaType::jsonLd: {
+      return JsonLdParser::parse(body);
+    }
+    case ad_utility::MediaType::shex: {
+      return ShExParser::parse(body);
+    }
+    case ad_utility::MediaType::datalog: {
+      return DatalogParser::parse(body);
     }
     default: {
       throwUnsupportedMediatype(toString(contentType));

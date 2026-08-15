@@ -30,6 +30,14 @@ enum class MediaType {
   csv,
   turtle,
   ntriples,
+  n3,
+  datalog,
+  shacl,
+  shex,
+  jsonLd,
+  rdfXml,
+  nquads,
+  trig,
   octetStream,
   binaryQleverExport
 };

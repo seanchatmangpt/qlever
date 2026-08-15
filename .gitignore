@@ -53,3 +53,4 @@ sourcelist
 
 /cmake-build*
 /localIndices
+.claude/

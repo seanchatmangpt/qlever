@@ -22,7 +22,8 @@ using enum MediaType;
 // required by the SPARQL standard.
 constexpr std::array SUPPORTED_MEDIA_TYPES{
     sparqlJson, sparqlXml,   qleverJson,        tsv, csv, turtle,
-    ntriples,   octetStream, binaryQleverExport};
+    ntriples,   n3,          datalog,           shacl, shex, jsonLd,
+    rdfXml,     nquads,      trig,              octetStream, binaryQleverExport};
 
 // _____________________________________________________________
 const ad_utility::HashMap<MediaType, MediaTypeImpl>& getAllMediaTypes() {
@@ -45,6 +46,14 @@ const ad_utility::HashMap<MediaType, MediaTypeImpl>& getAllMediaTypes() {
     add(qleverJson, "application", "qlever-results+json", {});
     add(turtle, "text", "turtle", {".ttl"});
     add(ntriples, "application", "n-triples", {".nt"});
+    add(n3, "text", "n3", {".n3"});
+    add(datalog, "text", "x-datalog", {".dl"});
+    add(shacl, "text", "shacl", {".shacl"});
+    add(shex, "text", "shex", {".shex"});
+    add(jsonLd, "application", "ld+json", {".jsonld"});
+    add(rdfXml, "application", "rdf+xml", {".rdf"});
+    add(nquads, "application", "n-quads", {".nq"});
+    add(trig, "application", "trig", {".trig"});
     add(octetStream, "application", "octet-stream", {});
     add(binaryQleverExport, "application", "qlever-export+octet-stream", {});
     return t;

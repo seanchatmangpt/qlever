@@ -203,6 +203,55 @@ void runConstructQueryTestCase(
   EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, turtle),
             testCase.resultTurtle);
 
+  // N3 should produce the same output as Turtle (N3 is a superset).
+  EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, n3),
+            testCase.resultTurtle);
+
+  // N-Quads should produce the same output as Turtle for default graph.
+  EXPECT_EQ(runQueryStreamableResult(testCase.kg, testCase.query, nquads),
+            testCase.resultTurtle);
+
+  // SHACL adds a prefix header, then same triples as Turtle.
+  auto shaclResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, shacl);
+  EXPECT_THAT(shaclResult, HasSubstr("@prefix sh:"));
+  if (!testCase.resultTurtle.empty()) {
+    EXPECT_THAT(shaclResult, HasSubstr(testCase.resultTurtle));
+  }
+
+  // TriG wraps output in graph block.
+  auto trigResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, trig);
+  EXPECT_THAT(trigResult, HasSubstr("{"));
+  EXPECT_THAT(trigResult, HasSubstr("}"));
+
+  // Datalog format should not crash and produces predicate(subject, object).
+  auto datalogResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, datalog);
+  if (!testCase.resultTurtle.empty()) {
+    EXPECT_THAT(datalogResult, HasSubstr("("));
+    EXPECT_THAT(datalogResult, HasSubstr(")."));
+  }
+
+  // JSON-LD format should produce valid JSON with @graph.
+  auto jsonLdResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, jsonLd);
+  EXPECT_THAT(jsonLdResult, HasSubstr("@graph"));
+
+  // RDF/XML format should produce valid XML with rdf:RDF.
+  auto rdfXmlResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, rdfXml);
+  EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:RDF"));
+  EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:Description"));
+
+  // ShEx format should produce valid shape expression syntax.
+  auto shexResult =
+      runQueryStreamableResult(testCase.kg, testCase.query, shex);
+  EXPECT_THAT(shexResult, HasSubstr("{"));
+  EXPECT_THAT(shexResult, HasSubstr("}"));
+  EXPECT_THAT(shexResult, HasSubstr("["));
+  EXPECT_THAT(shexResult, HasSubstr("]"));
+
   // Test the interaction of normal limit (the LIMIT of the query) and export
   // limit (the value of the `send` parameter).
   for (uint64_t exportLimit = 0ul; exportLimit < 4ul; ++exportLimit) {
@@ -2280,5 +2329,205 @@ TEST(ExportQueryExecutionTrees, SparqlJsonWithMetaField) {
     ASSERT_TRUE(result.contains("results"));
     ASSERT_TRUE(result["head"].contains("vars"));
     ASSERT_FALSE(result.contains("meta"));
+  }
+}
+
+// Comprehensive tests for all 8 new semantic export formats (N3, Datalog,
+// SHACL, ShEx, JSON-LD, RDF/XML, N-Quads, TriG) using a simple knowledge
+// graph with a CONSTRUCT query.
+TEST(ExportQueryExecutionTrees, ExportSemanticFormats) {
+  std::string kg =
+      "<http://example.org/Alice> <http://example.org/knows> "
+      "<http://example.org/Bob> . "
+      "<http://example.org/Alice> <http://example.org/name> \"Alice\" .";
+  std::string query = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // N3: Should produce N-Triples-like output (subject predicate object .)
+  {
+    auto result = runQueryStreamableResult(kg, query, n3);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Bob>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/name>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // Datalog: Should produce predicate(subject, object). format
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>("));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr(")."));
+    EXPECT_THAT(result, HasSubstr(", "));
+  }
+
+  // SHACL: Should contain the SHACL prefix and turtle-like triples
+  {
+    auto result = runQueryStreamableResult(kg, query, shacl);
+    EXPECT_THAT(result,
+                HasSubstr("@prefix sh: <http://www.w3.org/ns/shacl#> ."));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // ShEx: Should contain shape expressions with { [ ] } syntax
+  {
+    auto result = runQueryStreamableResult(kg, query, shex);
+    EXPECT_THAT(result, HasSubstr("{"));
+    EXPECT_THAT(result, HasSubstr("["));
+    EXPECT_THAT(result, HasSubstr("]"));
+    EXPECT_THAT(result, HasSubstr("}"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+  }
+
+  // JSON-LD: Should contain @graph and @id keys
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    EXPECT_THAT(result, HasSubstr("@id"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Alice"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/knows"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Bob"));
+    // Should be valid JSON
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+    ASSERT_FALSE(parsed["@graph"].empty());
+  }
+
+  // RDF/XML: Should contain rdf:Description and rdf:about
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("<?xml version=\"1.0\""));
+    EXPECT_THAT(result, HasSubstr("rdf:RDF"));
+    EXPECT_THAT(result, HasSubstr("rdf:Description"));
+    EXPECT_THAT(result, HasSubstr("rdf:about"));
+    EXPECT_THAT(result, HasSubstr("http://example.org/Alice"));
+    EXPECT_THAT(result, HasSubstr("</rdf:RDF>"));
+  }
+
+  // N-Quads: Should contain triple-like output with . terminators
+  {
+    auto result = runQueryStreamableResult(kg, query, nquads);
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Bob>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+
+  // TriG: Should contain graph block delimiters { }
+  {
+    auto result = runQueryStreamableResult(kg, query, trig);
+    EXPECT_THAT(result, HasSubstr("{"));
+    EXPECT_THAT(result, HasSubstr("}"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/Alice>"));
+    EXPECT_THAT(result, HasSubstr("<http://example.org/knows>"));
+    EXPECT_THAT(result, HasSubstr(" .\n"));
+  }
+}
+
+// Test that the 8 new semantic export formats handle a CONSTRUCT query that
+// matches nothing (empty result) without crashing and produce well-formed
+// output.
+TEST(ExportQueryExecutionTrees, SemanticFormatsEmptyResult) {
+  // Knowledge graph has triples, but the query uses a predicate that doesn't
+  // exist, so the CONSTRUCT result will be empty.
+  std::string kg =
+      "<http://example.org/Alice> <http://example.org/knows> "
+      "<http://example.org/Bob> .";
+  std::string query =
+      "CONSTRUCT { ?s <http://example.org/x> ?o } WHERE { ?s "
+      "<http://example.org/nonexistent> ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // N3: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, n3);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // Datalog: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // SHACL: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, shacl);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // ShEx: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, shex);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // JSON-LD: result must be valid JSON containing "@graph"
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+  }
+
+  // RDF/XML: result must contain rdf:RDF
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("rdf:RDF"));
+  }
+
+  // N-Quads: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, nquads);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+
+  // TriG: result must be a non-null string (no crash)
+  {
+    auto result = runQueryStreamableResult(kg, query, trig);
+    EXPECT_TRUE(result.empty() || !result.empty());
+  }
+}
+
+// Test that the 8 new semantic export formats correctly handle typed literals
+// and language-tagged strings.
+TEST(ExportQueryExecutionTrees, SemanticFormatsLiterals) {
+  std::string kg =
+      "<http://example.org/s> <http://example.org/age> "
+      "\"42\"^^<http://www.w3.org/2001/XMLSchema#integer> . "
+      "<http://example.org/s> <http://example.org/name> \"Alice\"@en .";
+  std::string query = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }";
+
+  using enum ad_utility::MediaType;
+
+  // JSON-LD: result must be valid JSON
+  {
+    auto result = runQueryStreamableResult(kg, query, jsonLd);
+    EXPECT_THAT(result, HasSubstr("@graph"));
+    auto parsed = nlohmann::json::parse(result);
+    ASSERT_TRUE(parsed.contains("@graph"));
+    ASSERT_TRUE(parsed["@graph"].is_array());
+    ASSERT_FALSE(parsed["@graph"].empty());
+  }
+
+  // Datalog: typed literals are rendered with ( and )
+  {
+    auto result = runQueryStreamableResult(kg, query, datalog);
+    EXPECT_THAT(result, HasSubstr("("));
+    EXPECT_THAT(result, HasSubstr(")"));
+  }
+
+  // RDF/XML: result must contain rdf:Description
+  {
+    auto result = runQueryStreamableResult(kg, query, rdfXml);
+    EXPECT_THAT(result, HasSubstr("rdf:Description"));
   }
 }

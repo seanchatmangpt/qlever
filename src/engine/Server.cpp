@@ -892,6 +892,22 @@ CPP_template_def(typename RequestT)(
     mediaType = MediaType::turtle;
   } else if (checkParameter(params, "action", "binary_export")) {
     mediaType = MediaType::octetStream;
+  } else if (checkParameter(params, "action", "n3_export")) {
+    mediaType = MediaType::n3;
+  } else if (checkParameter(params, "action", "datalog_export")) {
+    mediaType = MediaType::datalog;
+  } else if (checkParameter(params, "action", "shacl_export")) {
+    mediaType = MediaType::shacl;
+  } else if (checkParameter(params, "action", "shex_export")) {
+    mediaType = MediaType::shex;
+  } else if (checkParameter(params, "action", "jsonld_export")) {
+    mediaType = MediaType::jsonLd;
+  } else if (checkParameter(params, "action", "rdfxml_export")) {
+    mediaType = MediaType::rdfXml;
+  } else if (checkParameter(params, "action", "nquads_export")) {
+    mediaType = MediaType::nquads;
+  } else if (checkParameter(params, "action", "trig_export")) {
+    mediaType = MediaType::trig;
   }
 
   std::string_view acceptHeader = request.base()[http::field::accept];
@@ -942,8 +958,11 @@ ad_utility::MediaType Server::chooseBestFittingMediaType(
                                        MediaType::binaryQleverExport};
         return ad_utility::contains(supportedMediaTypes, mediaType);
       }
-      std::array supportedMediaTypes{MediaType::csv, MediaType::tsv,
-                                     MediaType::qleverJson, MediaType::turtle};
+      std::array supportedMediaTypes{
+          MediaType::csv,    MediaType::tsv,    MediaType::qleverJson,
+          MediaType::turtle, MediaType::n3,     MediaType::datalog,
+          MediaType::shacl,  MediaType::shex,   MediaType::jsonLd,
+          MediaType::rdfXml, MediaType::nquads, MediaType::trig};
       return ad_utility::contains(supportedMediaTypes, mediaType);
     });
     if (it != candidates.end()) {
