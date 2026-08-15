@@ -1,0 +1,65 @@
+name: Custom integration closure
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  python-utils:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build wheel and run unit tests
+        run: |
+          python -m pip install --upgrade pip build pytest
+          python -m build --wheel utils
+          python -m pip install utils/dist/*.whl
+          python -m pytest -q utils/tests
+      - name: Verify installed package outside the source tree
+        working-directory: /tmp
+        run: |
+          python -c 'import utils, utils.cli; print(utils.__file__)'
+          qlever-utils --help
+
+  rust-ffi:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install QLever dependencies
+        uses: ./.github/workflows/install-dependencies-ubuntu
+      - name: Install compiler
+        uses: ./.github/workflows/install-compiler-ubuntu
+        with:
+          compiler: gcc
+          compiler-version: 13
+      - name: Install bindgen runtime dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+      - name: Configure native library
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$(pwd)/toolchains/gcc13.cmake" \
+            -DUSE_PARALLEL=true \
+            -DRUN_EXPENSIVE_TESTS=false \
+            -DENABLE_EXPENSIVE_CHECKS=true \
+            -DUSE_PRECOMPILED_HEADERS=OFF
+      - name: Build qlever C shim
+        run: cmake --build build --target qlever_c -- -j "$(nproc)"
+      - name: Admit native library for Rust
+        run: |
+          lib="$(find "$GITHUB_WORKSPACE/build" -type f -name 'libqlever_c.so' -print -quit)"
+          test -n "$lib"
+          lib_dir="$(dirname "$lib")"
+          echo "QLEVER_LIB_DIR=$lib_dir" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+      - name: Run Rust FFI court
+        run: cargo test --manifest-path rust/Cargo.toml --workspace
