@@ -37,8 +37,7 @@ class RdfXmlParser {
     // backtracking regex engine. 100 MB is generous for Graph Store Protocol.
     constexpr size_t maxInputSize = 100 * 1024 * 1024;
     if (input.size() > maxInputSize) {
-      throw std::runtime_error(
-          "RDF/XML input exceeds maximum allowed size of 100 MB");
+      throw std::runtime_error("RDF/XML input exceeds maximum allowed size of 100 MB");
     }
 
     // Regex to match <rdf:Description rdf:about="..." [xmlns:X="..."]* >
@@ -61,8 +60,7 @@ class RdfXmlParser {
     static const std::regex literalObjectRegex(
         R"(<([a-zA-Z_][\w.-]*:[a-zA-Z_][\w.-]*)\s*>([^<]*)</\1\s*>)");
 
-    auto descBegin =
-        std::sregex_iterator(input.begin(), input.end(), descriptionRegex);
+    auto descBegin = std::sregex_iterator(input.begin(), input.end(), descriptionRegex);
     auto descEnd = std::sregex_iterator();
 
     for (auto it = descBegin; it != descEnd; ++it) {
@@ -77,16 +75,14 @@ class RdfXmlParser {
       std::unordered_map<std::string, std::string> prefixMap;
       prefixMap["rdf"] = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-      auto nsBegin = std::sregex_iterator(extraAttrs.begin(), extraAttrs.end(),
-                                          xmlnsRegex);
+      auto nsBegin = std::sregex_iterator(extraAttrs.begin(), extraAttrs.end(), xmlnsRegex);
       auto nsEnd = std::sregex_iterator();
       for (auto ns = nsBegin; ns != nsEnd; ++ns) {
         prefixMap[(*ns)[1].str()] = (*ns)[2].str();
       }
 
       // Expand a "prefix:local" token using the per-block prefix map.
-      auto expandWithMap =
-          [&prefixMap](const std::string& prefixedName) -> std::string {
+      auto expandWithMap = [&prefixMap](const std::string& prefixedName) -> std::string {
         auto colonPos = prefixedName.find(':');
         if (colonPos == std::string::npos) return prefixedName;
         std::string prefix = prefixedName.substr(0, colonPos);
@@ -101,12 +97,11 @@ class RdfXmlParser {
 
       // Check for the fallback <rdf:predicate> / <rdf:object> encoding.
       // This is used when the predicate IRI has no valid XML local name.
-      static const std::regex rdfPredicateRegex(
-          R"(<rdf:predicate\s+rdf:resource="([^"]*)"\s*/>)");
-      static const std::regex rdfObjectIriRegex(
-          R"(<rdf:object\s+rdf:resource="([^"]*)"\s*/>)");
-      static const std::regex rdfObjectLitRegex(
-          R"(<rdf:object\s*>([^<]*)</rdf:object\s*>)");
+      static const std::regex rdfPredicateRegex(R"(<rdf:predicate\s+rdf:resource="([^"]*)"\s * /
+                                                >) ");
+          static const std::regex rdfObjectIriRegex(R"(<rdf:object\s+rdf:resource="([^"]*)"\s * /
+                                                    >) ");
+          static const std::regex rdfObjectLitRegex(R"(<rdf:object\s*>([^<]*)</rdf:object\s*>)");
 
       std::smatch predMatch;
       if (std::regex_search(blockContent, predMatch, rdfPredicateRegex)) {
@@ -116,23 +111,16 @@ class RdfXmlParser {
         if (std::regex_search(blockContent, objMatch, rdfObjectIriRegex)) {
           std::string objIri = unescapeXml(objMatch[1].str());
           TurtleTriple triple;
-          triple.subject_ = TripleComponent::Iri::fromIriref(
-              wrapInAngleBrackets(subjectIri));
-          triple.predicate_ =
-              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
-          triple.object_ =
-              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(objIri));
+          triple.subject_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
+          triple.predicate_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
+          triple.object_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(objIri));
           result.push_back(std::move(triple));
-        } else if (std::regex_search(blockContent, objMatch,
-                                     rdfObjectLitRegex)) {
+        } else if (std::regex_search(blockContent, objMatch, rdfObjectLitRegex)) {
           std::string literalValue = unescapeXml(objMatch[1].str());
           TurtleTriple triple;
-          triple.subject_ = TripleComponent::Iri::fromIriref(
-              wrapInAngleBrackets(subjectIri));
-          triple.predicate_ =
-              TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
-          triple.object_ =
-              TripleComponent::Literal::literalWithoutQuotes(literalValue);
+          triple.subject_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
+          triple.predicate_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predIri));
+          triple.object_ = TripleComponent::Literal::literalWithoutQuotes(literalValue);
           result.push_back(std::move(triple));
         }
         // Fallback block handled; skip normal predicate scanning.
@@ -140,8 +128,8 @@ class RdfXmlParser {
       }
 
       // Find IRI object triples within this block.
-      auto iriBegin = std::sregex_iterator(blockContent.begin(),
-                                           blockContent.end(), iriObjectRegex);
+      auto iriBegin =
+          std::sregex_iterator(blockContent.begin(), blockContent.end(), iriObjectRegex);
       auto iterEnd = std::sregex_iterator();
       for (auto jt = iriBegin; jt != iterEnd; ++jt) {
         const std::smatch& tripleMatch = *jt;
@@ -149,18 +137,15 @@ class RdfXmlParser {
         std::string objectIri = unescapeXml(tripleMatch[2].str());
 
         TurtleTriple triple;
-        triple.subject_ =
-            TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
-        triple.predicate_ =
-            TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predicate));
-        triple.object_ =
-            TripleComponent::Iri::fromIriref(wrapInAngleBrackets(objectIri));
+        triple.subject_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
+        triple.predicate_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predicate));
+        triple.object_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(objectIri));
         result.push_back(std::move(triple));
       }
 
       // Find literal object triples within this block.
-      auto litBegin = std::sregex_iterator(
-          blockContent.begin(), blockContent.end(), literalObjectRegex);
+      auto litBegin =
+          std::sregex_iterator(blockContent.begin(), blockContent.end(), literalObjectRegex);
       auto litEnd = std::sregex_iterator();
       for (auto jt = litBegin; jt != litEnd; ++jt) {
         const std::smatch& tripleMatch = *jt;
@@ -168,12 +153,9 @@ class RdfXmlParser {
         std::string literalValue = unescapeXml(tripleMatch[2].str());
 
         TurtleTriple triple;
-        triple.subject_ =
-            TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
-        triple.predicate_ =
-            TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predicate));
-        triple.object_ =
-            TripleComponent::Literal::literalWithoutQuotes(literalValue);
+        triple.subject_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(subjectIri));
+        triple.predicate_ = TripleComponent::Iri::fromIriref(wrapInAngleBrackets(predicate));
+        triple.object_ = TripleComponent::Literal::literalWithoutQuotes(literalValue);
         result.push_back(std::move(triple));
       }
     }

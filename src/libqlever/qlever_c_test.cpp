@@ -10,14 +10,14 @@
 //   cmake --build . --target qlever_c_tests
 //   ./qlever_c_tests
 
+#include "libqlever/qlever_c.h"
+
 #include <gtest/gtest.h>
 
 #include <cstring>
 #include <string>
 #include <thread>
 #include <vector>
-
-#include "libqlever/qlever_c.h"
 
 // ---------------------------------------------------------------------------
 // Helper: check that the error message set after a failing call is non-empty.
@@ -195,7 +195,7 @@ TEST(QleverCShim, Create_NonexistentIndex_ReturnsNull) {
 
 TEST(QleverCShim, ConcurrentNullCalls_NoDataRace) {
   constexpr int kThreads = 16;
-  constexpr int kIters   = 50;
+  constexpr int kIters = 50;
 
   std::vector<std::thread> threads;
   threads.reserve(kThreads);
@@ -207,8 +207,7 @@ TEST(QleverCShim, ConcurrentNullCalls_NoDataRace) {
         const char* err = qlever_last_error();
         // Each thread must see its own non-empty error.
         ASSERT_NE(err, nullptr);
-        EXPECT_GT(std::strlen(err), 0u)
-            << "thread " << t << " iteration " << i;
+        EXPECT_GT(std::strlen(err), 0u) << "thread " << t << " iteration " << i;
       }
     });
   }
