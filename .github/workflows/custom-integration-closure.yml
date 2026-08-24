@@ -52,8 +52,8 @@ jobs:
             -DRUN_EXPENSIVE_TESTS=false \
             -DENABLE_EXPENSIVE_CHECKS=true \
             -DUSE_PRECOMPILED_HEADERS=OFF
-      - name: Build qlever C shim
-        run: cmake --build build --target qlever_c -- -j "$(nproc)"
+      - name: Build qlever C shim within hosted-runner memory budget
+        run: cmake --build build --target qlever_c -- -j 2
       - name: Admit native library for Rust
         run: |
           lib="$(find "$GITHUB_WORKSPACE/build" -type f -name 'libqlever_c.so' -print -quit)"
