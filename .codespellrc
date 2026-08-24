@@ -4,5 +4,6 @@ skip = .git*,.codespellrc,*.pdf,generated
 check-hidden = true
 # Ignore mixedCase variables, lines with latin, lines with codespell-ignore pragma, etc
 ignore-regex = \b([A-Z]*[a-z]+[A-Z][a-zA-Z]*)\b|.*(Lorem ipsum|eleifend|feugait|codespell-ignore).*|https?://\S+
-# alph - is used frequently in tests, just ignore altogether
-ignore-words-list = ser,alph,inbetween,interm
+# alph is used frequently in tests. `selekt` is an intentional malformed-SPARQL
+# falsifier, and `re-uses` is established terminology in the libqlever comment.
+ignore-words-list = ser,alph,inbetween,interm,selekt,re-uses
