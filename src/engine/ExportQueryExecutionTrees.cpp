@@ -359,7 +359,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
 }
 
 // _____________________________________________________________________________
-// N3 export for CONSTRUCT queries (N3 is a superset of Turtle, reuse Turtle output)
+// N3 export for CONSTRUCT queries (N3 is a superset of Turtle, reuse Turtle
+// output)
 template <>
 STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
     constructQueryResultToStream<ad_utility::MediaType::n3>(
@@ -457,7 +458,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
 }
 
 // _____________________________________________________________________________
-// N-Quads export for CONSTRUCT queries (N-Triples with optional graph component)
+// N-Quads export for CONSTRUCT queries (N-Triples with optional graph
+// component)
 template <>
 STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
     constructQueryResultToStream<ad_utility::MediaType::nquads>(
@@ -561,7 +563,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
     node["@id"] = stripAngles(subjectStr);
     // Check if object is an IRI (starts with <) or a literal
     if (ql::starts_with(triple.object_, '<')) {
-      node[stripAngles(predicateStr)] = nlohmann::json{{"@id", stripAngles(objectStr)}};
+      node[stripAngles(predicateStr)] =
+          nlohmann::json{{"@id", stripAngles(objectStr)}};
     } else {
       node[stripAngles(predicateStr)] = objectStr;
     }
@@ -599,9 +602,11 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
 
   // Helper: escape XML special characters.
   auto escapeXml = [](const std::string& s) -> std::string {
-    return absl::StrReplaceAll(
-        s, {{"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"},
-            {"\"", "&quot;"}, {"'", "&apos;"}});
+    return absl::StrReplaceAll(s, {{"&", "&amp;"},
+                                   {"<", "&lt;"},
+                                   {">", "&gt;"},
+                                   {"\"", "&quot;"},
+                                   {"'", "&apos;"}});
   };
 
   // Helper: return true if `c` is a valid XML NCName start character.
@@ -660,9 +665,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
     if (hasSplit) {
       // Emit <rdf:Description rdf:about="S" xmlns:pred="NS">
       STREAMABLE_YIELD(absl::StrCat("  <rdf:Description rdf:about=\"",
-                                    escapeXml(subject),
-                                    "\" xmlns:pred=\"", escapeXml(predNs),
-                                    "\">\n"));
+                                    escapeXml(subject), "\" xmlns:pred=\"",
+                                    escapeXml(predNs), "\">\n"));
     } else {
       // Predicate IRI has no valid local name; fall back to encoding it as
       // rdf:predicate / rdf:object inside an rdf:Statement so no information
@@ -689,8 +693,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
           objectStr = triple.object_;
         }
         STREAMABLE_YIELD(absl::StrCat("    <pred:", predLocal, ">",
-                                      escapeXml(objectStr), "</pred:",
-                                      predLocal, ">\n"));
+                                      escapeXml(objectStr),
+                                      "</pred:", predLocal, ">\n"));
       }
     } else {
       // Fallback: encode as <rdf:predicate> / <rdf:object> pair so the
@@ -729,7 +733,8 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::
         CancellationHandle cancellationHandle,
         [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
   result->logResultSize();
-  STREAMABLE_YIELD("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\n");
+  STREAMABLE_YIELD(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\n");
   [[maybe_unused]] uint64_t resultSize = 0;
   auto generator = constructQueryResultToTriples(
       qet, constructTriples, limitAndOffset, result, resultSize,
@@ -1268,11 +1273,11 @@ STREAMABLE_GENERATOR_TYPE ExportQueryExecutionTrees::selectQueryResultToStream(
     [[maybe_unused]] STREAMABLE_YIELDER_TYPE streamableYielder) {
   static_assert(format == MediaType::octetStream || format == MediaType::csv ||
                 format == MediaType::tsv || format == MediaType::turtle ||
-                format == MediaType::qleverJson ||
-                format == MediaType::n3 || format == MediaType::datalog ||
-                format == MediaType::shacl || format == MediaType::shex ||
-                format == MediaType::jsonLd || format == MediaType::rdfXml ||
-                format == MediaType::nquads || format == MediaType::trig);
+                format == MediaType::qleverJson || format == MediaType::n3 ||
+                format == MediaType::datalog || format == MediaType::shacl ||
+                format == MediaType::shex || format == MediaType::jsonLd ||
+                format == MediaType::rdfXml || format == MediaType::nquads ||
+                format == MediaType::trig);
 
   // TODO<joka921> Use a proper error message, or check that we get a more
   // reasonable error from upstream.
@@ -1719,9 +1724,8 @@ ExportQueryExecutionTrees::computeResult(
   auto inner =
       ad_utility::ConstexprSwitch<csv, tsv, octetStream, turtle, sparqlXml,
                                   sparqlJson, qleverJson, binaryQleverExport,
-                                  n3, datalog, shacl, shex,
-                                  jsonLd, rdfXml, nquads, trig>{}(
-          compute, mediaType);
+                                  n3, datalog, shacl, shex, jsonLd, rdfXml,
+                                  nquads, trig>{}(compute, mediaType);
 
   return [](auto range) -> cppcoro::generator<std::string> {
     for (auto&& item : range) {
@@ -1731,9 +1735,9 @@ ExportQueryExecutionTrees::computeResult(
 
 #else
   ad_utility::ConstexprSwitch<csv, tsv, octetStream, turtle, sparqlXml,
-                              sparqlJson, qleverJson, binaryQleverExport,
-                              n3, datalog, shacl, shex,
-                              jsonLd, rdfXml, nquads, trig>{}(compute, mediaType);
+                              sparqlJson, qleverJson, binaryQleverExport, n3,
+                              datalog, shacl, shex, jsonLd, rdfXml, nquads,
+                              trig>{}(compute, mediaType);
 #endif
 }
 
