@@ -138,8 +138,7 @@ TEST(ServerTest, chooseBestFittingMediaType) {
   EXPECT_EQ(choose({octetStream, sparqlJson}, constructQuery), turtle);
 
   // New semantic formats: supported for CONSTRUCT only.
-  for (auto fmt :
-       {n3, datalog, shacl, shex, jsonLd, rdfXml, nquads, trig}) {
+  for (auto fmt : {n3, datalog, shacl, shex, jsonLd, rdfXml, nquads, trig}) {
     EXPECT_EQ(choose({fmt}, constructQuery), fmt);
     // Should fall back for ASK and SELECT queries.
     EXPECT_EQ(choose({fmt}, askQuery), sparqlJson);

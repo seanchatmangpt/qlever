@@ -165,10 +165,10 @@ TEST(AcceptHeaderParser, FindMediaTypeFromAcceptHeader) {
   // because it is explicit.
   p = "text/*, application/qlever-results+json";
   result = getMediaTypesFromAcceptHeader(p);
-  EXPECT_THAT(result, ElementsAre(MediaType::qleverJson, MediaType::tsv,
-                                  MediaType::csv, MediaType::turtle,
-                                  MediaType::n3, MediaType::datalog,
-                                  MediaType::shacl, MediaType::shex));
+  EXPECT_THAT(result,
+              ElementsAre(MediaType::qleverJson, MediaType::tsv, MediaType::csv,
+                          MediaType::turtle, MediaType::n3, MediaType::datalog,
+                          MediaType::shacl, MediaType::shex));
 
   // The wildcard matches text types, since the json is not supported.
   p = "text/*, application/json";

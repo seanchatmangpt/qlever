@@ -20,10 +20,23 @@ using enum MediaType;
 // The first media type in this list is the default, if no other type is
 // specified in the request. It's "application/sparql-results+json", as
 // required by the SPARQL standard.
-constexpr std::array SUPPORTED_MEDIA_TYPES{
-    sparqlJson, sparqlXml,   qleverJson,        tsv, csv, turtle,
-    ntriples,   n3,          datalog,           shacl, shex, jsonLd,
-    rdfXml,     nquads,      trig,              octetStream, binaryQleverExport};
+constexpr std::array SUPPORTED_MEDIA_TYPES{sparqlJson,
+                                           sparqlXml,
+                                           qleverJson,
+                                           tsv,
+                                           csv,
+                                           turtle,
+                                           ntriples,
+                                           n3,
+                                           datalog,
+                                           shacl,
+                                           shex,
+                                           jsonLd,
+                                           rdfXml,
+                                           nquads,
+                                           trig,
+                                           octetStream,
+                                           binaryQleverExport};
 
 // _____________________________________________________________
 const ad_utility::HashMap<MediaType, MediaTypeImpl>& getAllMediaTypes() {

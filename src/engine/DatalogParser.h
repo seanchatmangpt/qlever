@@ -39,7 +39,8 @@ class DatalogParser {
         // remaining input. These parsers only round-trip QLever's own output,
         // so partial failures should not silently drop everything that follows.
         auto nl = remaining.find('\n');
-        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        remaining = (nl == std::string_view::npos) ? std::string_view{}
+                                                   : remaining.substr(nl + 1);
         continue;
       }
 
@@ -52,7 +53,8 @@ class DatalogParser {
       if (comma == std::string_view::npos) {
         // Malformed statement (no ','): skip to next line.
         auto nl = remaining.find('\n');
-        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        remaining = (nl == std::string_view::npos) ? std::string_view{}
+                                                   : remaining.substr(nl + 1);
         continue;
       }
 
@@ -65,7 +67,8 @@ class DatalogParser {
       if (parenClose == std::string_view::npos) {
         // Malformed statement (no ')'): skip to next line.
         auto nl = remaining.find('\n');
-        remaining = (nl == std::string_view::npos) ? std::string_view{} : remaining.substr(nl + 1);
+        remaining = (nl == std::string_view::npos) ? std::string_view{}
+                                                   : remaining.substr(nl + 1);
         continue;
       }
 
@@ -152,8 +155,7 @@ class DatalogParser {
     // Find the closing quote of the literal content, handling escapes.
     size_t closeQuote = findClosingQuote(s);
     if (closeQuote == std::string::npos || closeQuote == 0) {
-      throw std::runtime_error(
-          "Datalog parse error: malformed literal: " + s);
+      throw std::runtime_error("Datalog parse error: malformed literal: " + s);
     }
 
     std::string_view quotedPart(s.data(), closeQuote + 1);
@@ -162,7 +164,8 @@ class DatalogParser {
 
     if (suffix.empty()) {
       // Plain literal: "content"
-      return TripleComponent(Literal::fromEscapedRdfLiteral(quotedPart.data(), quotedPart.size()));
+      return TripleComponent(
+          Literal::fromEscapedRdfLiteral(quotedPart.data(), quotedPart.size()));
     } else if (suffix.size() >= 2 && suffix[0] == '@') {
       // Language-tagged literal: "content"@lang
       // Reconstruct the full literal string with language tag for parsing

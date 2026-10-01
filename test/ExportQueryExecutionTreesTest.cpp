@@ -220,8 +220,7 @@ void runConstructQueryTestCase(
   }
 
   // TriG wraps output in graph block.
-  auto trigResult =
-      runQueryStreamableResult(testCase.kg, testCase.query, trig);
+  auto trigResult = runQueryStreamableResult(testCase.kg, testCase.query, trig);
   EXPECT_THAT(trigResult, HasSubstr("{"));
   EXPECT_THAT(trigResult, HasSubstr("}"));
 
@@ -245,8 +244,7 @@ void runConstructQueryTestCase(
   EXPECT_THAT(rdfXmlResult, HasSubstr("rdf:Description"));
 
   // ShEx format should produce valid shape expression syntax.
-  auto shexResult =
-      runQueryStreamableResult(testCase.kg, testCase.query, shex);
+  auto shexResult = runQueryStreamableResult(testCase.kg, testCase.query, shex);
   EXPECT_THAT(shexResult, HasSubstr("{"));
   EXPECT_THAT(shexResult, HasSubstr("}"));
   EXPECT_THAT(shexResult, HasSubstr("["));

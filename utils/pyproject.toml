@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "qlever-utils"
@@ -17,8 +17,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
 [project.scripts]
 qlever-utils = "utils.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ad-freiburg/qlever"
+
+[tool.setuptools]
+packages = ["utils"]
+package-dir = { "utils" = "." }
